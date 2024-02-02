@@ -1,0 +1,45 @@
+{{- range .Values.syncedRepos}}
+{{- $name := .name}}
+{{- with .auth}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+type: Opaque
+stringData:
+  username: "{{ .username }}"
+  password: "{{ .password }}"
+{{- end }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: {{ $name }}
+spec:
+  {{- with .auth }}
+  secretRef:
+    name: {{ $name }}
+  {{- end }}
+  interval: 1m
+  ref:
+    branch: {{ .branch }}
+  url: {{ .url }}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: {{ $name }}
+spec:
+  interval: 1m
+  prune: true
+  postBuild:
+    substitute:
+      var_substitution_enabled: 'true'
+      {{- range $k, $v := .values }}
+      {{ $k }}: "{{ $v }}"
+      {{- end }}
+  sourceRef:
+    kind: GitRepository
+    name: {{ .name }}
+---
+{{- end }}
